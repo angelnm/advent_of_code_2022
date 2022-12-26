@@ -8,8 +8,7 @@ class Tile:
         self.x = _x
         self.y = _y
         self.data = _data
-
-        # RIGHT=0 | DOWN=1 | LEFT=2 | UP=3      
+    
         self.adjacent = [None, None, None, None]
     
     def get_right(self):
@@ -20,7 +19,7 @@ class Tile:
         return self.adjacent[2]
     def get_up(self):
         return self.adjacent[3]
-    
+
     def set_right(self, tile):
         tile.set_left(self)        
     def set_left(self, tile):
@@ -32,6 +31,15 @@ class Tile:
         self.adjacent[3] = tile
         tile.adjacent[1] = self
     
+    def get_adjacent(self, tile):
+        for idx, adj in enumerate(self.adjacent):
+            if adj == None:
+                print('AÑSLDJKF')
+                continue
+            if adj == tile:
+                return idx
+        return NONE
+
     def __str__(self):
         string = ""
         string += str(self.x+1) + " " + str(self.y+1) + ": " + self.data
@@ -44,8 +52,7 @@ class Cube:
         
         # RIGHT=0 | DOWN=1 | LEFT=2 | UP=3
         self.adjacent =  [None, None, None, None]
-        self.connected = [False, False, False, False]
-    
+
     def check_sides(self):
         #print("START", self)
         for side, cube_info in enumerate(self.adjacent):
@@ -72,8 +79,8 @@ class Cube:
             if adj == None:
                 continue
             if adj[0] == cube:
-                return idx
-        return -1
+                return idx, adj[1]
+        return -1, -1
     
     def is_complet(self):
         for side in self.adjacent:
@@ -81,6 +88,15 @@ class Cube:
                 return False
         return True
     
+    def get_row(self, direction):
+        if direction == 0:
+            return self.get_right_row()
+        if direction == 1:
+            return self.get_down_row()
+        if direction == 2:
+            return self.get_left_row()
+        return self.get_up_row()
+
     def get_up_row(self):
         tiles = [self.start]
         for _ in range(CUBE_SIZE-1):
@@ -90,6 +106,7 @@ class Cube:
         tiles = [self.start]
         for _ in range(CUBE_SIZE-1):
             tiles.append(tiles[-1].get_down())
+        return tiles
     def get_down_row(self):
         start = self.start
         for _ in range(CUBE_SIZE-1):
@@ -109,16 +126,12 @@ class Cube:
     
     def set_right(self, cube):
         self.adjacent[0] = [cube, 0]
-        self.connected[0] = True
     def set_down(self, cube, rot=0):
         self.adjacent[1] = [cube, 0]
-        self.connected[1] = True
     def set_left(self, cube, rot=0):
         self.adjacent[2] = [cube, 0]
-        self.connected[2] = True
     def set_up(self, cube, rot=0):
         self.adjacent[3] = [cube, 0]
-        self.connected[3] = True
     
     def __str__(self):
         string = ""
@@ -148,21 +161,43 @@ class Map_Manager:
         # READ PATH
         n_line +=1
         self.path = day_input[n_line]
-        #self.navigate()
-    
+        self.navigate()
+
+    def number2direction(self, direction):
+        if direction==RIGHT:
+            return "RIGHT"
+        if direction==UP:
+            return "UP"
+        if direction==LEFT:
+            return "LEFT"
+        return "DOWN"
+
     def move(self, start, number, direction):
         for _ in range(number):
             n_tile = start.adjacent[direction]
             if n_tile.data == '#':
                 break
+            direction = n_tile.get_adjacent(start)
+            direction = (direction+2)%4
             start = n_tile
-        return start
+        return start, direction
     
     def navigate(self):
         c_tile = self.start_tile
+        """
+        for _ in range(4):
+            c_tile = c_tile.adjacent[RIGHT]
+        for _ in range(0):
+            c_tile = c_tile.adjacent[UP]
         print(c_tile)
-        c_dirt = 0
-        
+        for n in c_tile.adjacent:
+            print(n)
+        return
+        """
+
+        c_dirt = RIGHT
+        print(self.number2direction(c_dirt), c_tile)
+
         number = ""
         for char in self.path:
             if '0' <= char <= '9':
@@ -170,8 +205,7 @@ class Map_Manager:
                 continue
             # MOVE
             number = int(number)  
-            c_tile = self.move(c_tile, number, c_dirt)
-            print(c_tile)
+            c_tile, c_dirt = self.move(c_tile, number, c_dirt)
             number = ""
             # CHANGE DIRECTION
             if char == 'R':
@@ -179,9 +213,11 @@ class Map_Manager:
             else:
                 c_dirt -= 1
             c_dirt = c_dirt%4
+            print(self.number2direction(c_dirt), c_tile)
         number = int(number)
-        c_tile = self.move(c_tile, number, c_dirt)
-    
+        c_tile, c_dirt = self.move(c_tile, number, c_dirt)
+        print(self.number2direction(c_dirt), c_tile)
+
         result = 1000*(c_tile.y+1) + 4*(c_tile.x+1) + c_dirt
         print(result)
         
@@ -222,7 +258,7 @@ class Map_Manager:
 
     def configure_cube(self, c_cubes):
         # PRINT CUBE
-        for row in c_cubes:
+        for y, row in enumerate(c_cubes):
             string = ""
             for cube in row:
                 if not cube:
@@ -230,6 +266,7 @@ class Map_Manager:
                     continue
                 string += str(cube.id)
             print(string)
+        print()
         # BASIC CONFIGURE
         cube_list = []
         for idx_y, row in enumerate(c_cubes):
@@ -246,35 +283,119 @@ class Map_Manager:
                 if idx_y<len(c_cubes)-1 and c_cubes[idx_y+1][idx_x]!=None:
                     cube.set_down(c_cubes[idx_y+1][idx_x])
         # PRO CONFIGURE
-        copy_list = []
-        for c in cube_list:
-            copy_list.append(c)
-        while len(copy_list)>0: 
-            c_cube = copy_list.pop(0)
-            c_cube.check_sides()
-            if not c_cube.is_complet():
-                copy_list.append(c_cube)
+        c_cube = cube_list[1-1]
+        c_cube.adjacent[RIGHT] = [cube_list[2-1],0]
+        c_cube.adjacent[DOWN]  = [cube_list[3-1],0]
+        c_cube.adjacent[LEFT]  = [cube_list[4-1],0]
+        c_cube.adjacent[UP]    = [cube_list[6-1],0]
+
+        c_cube = cube_list[2-1]
+        c_cube.adjacent[RIGHT] = [cube_list[5-1],0]
+        c_cube.adjacent[DOWN]  = [cube_list[3-1],0]
+        c_cube.adjacent[LEFT]  = [cube_list[1-1],0]
+        c_cube.adjacent[UP]    = [cube_list[6-1],0]
+
+        c_cube = cube_list[3-1]
+        c_cube.adjacent[RIGHT] = [cube_list[2-1],0]
+        c_cube.adjacent[DOWN]  = [cube_list[5-1],0]
+        c_cube.adjacent[LEFT]  = [cube_list[4-1],0]
+        c_cube.adjacent[UP]    = [cube_list[1-1],0]
+
+        c_cube = cube_list[4-1]
+        c_cube.adjacent[RIGHT] = [cube_list[5-1],0]
+        c_cube.adjacent[DOWN]  = [cube_list[6-1],0]
+        c_cube.adjacent[LEFT]  = [cube_list[1-1],0]
+        c_cube.adjacent[UP]    = [cube_list[3-1],0]
+
+        c_cube = cube_list[5-1]
+        c_cube.adjacent[RIGHT] = [cube_list[2-1],0]
+        c_cube.adjacent[DOWN]  = [cube_list[6-1],0]
+        c_cube.adjacent[LEFT]  = [cube_list[4-1],0]
+        c_cube.adjacent[UP]    = [cube_list[3-1],0]
+
+        c_cube = cube_list[6-1]
+        c_cube.adjacent[RIGHT] = [cube_list[5-1],0]
+        c_cube.adjacent[DOWN]  = [cube_list[2-1],0]
+        c_cube.adjacent[LEFT]  = [cube_list[1-1],0]
+        c_cube.adjacent[UP]    = [cube_list[4-1],0]
+
         # CONECT TILES
+        c_cube = cube_list[1-1]
+        n_cube = cube_list[4-1]
+        print(c_cube.get_adjacent(cube_list[4-1]))
+        self.connect(c_cube, LEFT, n_cube, True)
+        n_cube = cube_list[6-1]
+        self.connect(c_cube, UP, n_cube, False)
+        
+        c_cube = cube_list[2-1]
+        n_cube = cube_list[5-1]
+        self.connect(c_cube, RIGHT, n_cube, True)
+        n_cube = cube_list[3-1]
+        self.connect(c_cube, DOWN, n_cube, False)
+        n_cube = cube_list[6-1]
+        self.connect(c_cube, UP, n_cube, False)
+        
+        c_cube = cube_list[3-1]
+        n_cube = cube_list[4-1]
+        self.connect(c_cube, LEFT, n_cube, False)
+
+        c_cube = cube_list[5-1]
+        n_cube = cube_list[6-1]
+        self.connect(c_cube, DOWN, n_cube, False)
+
+        print(cube_list[6-1])
+
+
         """
-        for cube in cube_list:
-            print(cube)
-            for side, (n_cube, connected) in enumerate(zip(cube.adjacent, cube.connected)):
-                if connected:
-                    continue
-                print(side, n_cube[0].get_adjacent(cube))
+        n_cube = cube_list[6-1]
+        self.connect(c_cube, RIGHT, n_cube, True)
+        n_cube = cube_list[3-1]
+        self.connect(c_cube, LEFT, n_cube, False)
+        n_cube = cube_list[2-1]
+        self.connect(c_cube, UP, n_cube, True)
+        
+        c_cube = cube_list[2-1]
+        n_cube = cube_list[5-1]
+        self.connect(c_cube, DOWN, n_cube, True)
+        n_cube = cube_list[6-1]
+        self.connect(c_cube, LEFT, n_cube, True)
+        
+        c_cube = cube_list[3-1]
+        n_cube = cube_list[5-1]
+        self.connect(c_cube, DOWN, n_cube, True)
+        
+        c_cube = cube_list[4-1]
+        n_cube = cube_list[6-1]
+        self.connect(c_cube, RIGHT, n_cube, True)
+        print(c_cube)
+        print(n_cube)
         """
-                
+
+    def connect(self, c_cube, c_side, n_cube, is_reversed):
+        c_row = c_cube.get_row(c_side)
+        n_side, _ = n_cube.get_adjacent(c_cube)
+        n_row = n_cube.get_row(n_side)
+        if is_reversed:
+            n_row = reversed(n_row)
+        self.connect_tiles(c_row, c_side, n_row, n_side)
+
+    def connect_tiles(self, c_row, c_side, n_row, n_side):
+        for c_tile, n_tile in zip(c_row, n_row):
+            c_tile.adjacent[c_side] = n_tile
+            n_tile.adjacent[n_side] = c_tile
         
     def configure_map(self, c_map):
         # PRINT MAP
-        for row in c_map:
-            string = ""
+        for y, row in enumerate(c_map):
+            string = str(y+1)
+            string += " : " if y<9 else ": "
             for element in row:
                 if not element:
                     string += " "
                     continue
                 string += element.data
             print(string)
+        print()
         # CONFIGURE MAP
         u_previous = [None]*len(c_map[0])
         for row in c_map:
@@ -290,7 +411,13 @@ class Map_Manager:
                     
                     
 
-CUBE_SIZE = 4 
+CUBE_SIZE = 50
+        # RIGHT=0 | DOWN=1 | LEFT=2 | UP=3 
+NONE = -1
+RIGHT = 0
+DOWN = 1
+LEFT = 2
+UP = 3
 if __name__ == "__main__":
     day_input = read_file("input.txt")
     
